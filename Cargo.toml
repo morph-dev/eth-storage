@@ -1,0 +1,22 @@
+[workspace]
+
+members = [ "db", "merkle", "verkle" ]
+resolver = "2"
+
+[profile.bench]
+debug = true
+opt-level = 3
+debug-assertions = true
+incremental = true
+
+[profile.release]
+debug = true
+opt-level = 3
+debug-assertions = true
+incremental = true
+
+[profile.test]
+debug = true
+opt-level = 3
+debug-assertions = true
+incremental = true
