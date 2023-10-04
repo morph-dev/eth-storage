@@ -37,6 +37,10 @@ impl Nibbles {
     const LEAF_FLAG: u8 = 0b10;
     const ODD_LEN_FLAG: u8 = 0b01;
 
+    pub fn compact_len(&self) -> usize {
+        1 + self.len() / 2
+    }
+
     pub fn to_compact(&self, is_leaf: bool) -> Vec<u8> {
         let leaf_flag: u8 = if is_leaf { Self::LEAF_FLAG } else { 0 };
 
@@ -120,7 +124,7 @@ mod tests {
 
     #[test]
     fn compact() {
-        for (compact, nibbles, is_leaf) in [
+        for (compact, nibbles_vec, is_leaf) in [
             // manual
             (vec![0x00], vec![], false),
             (vec![0x20], vec![], true),
@@ -144,11 +148,20 @@ mod tests {
             ),
             (vec![0x3f, 0x1c, 0xb8], vec![0xf, 0x1, 0xc, 0xb, 0x8], true),
         ] {
-            let (nibbles_from_compact, is_leaf_from_compact) = Nibbles::from_compact(&compact);
-            assert_eq!(nibbles_from_compact.as_ref(), nibbles);
-            assert_eq!(is_leaf_from_compact, is_leaf);
+            // to compact
+            let nibbles = Nibbles::from(&nibbles_vec);
+            assert_eq!(
+                nibbles.compact_len(),
+                compact.len(),
+                ", we are testing nibbles: {:02x?}",
+                nibbles_vec
+            );
+            assert_eq!(nibbles.to_compact(is_leaf), compact);
 
-            assert_eq!(nibbles_from_compact.to_compact(is_leaf_from_compact), compact);
+            // from compact
+            let (nibbles_from_compact, is_leaf_from_compact) = Nibbles::from_compact(&compact);
+            assert_eq!(nibbles_from_compact.nibbles, nibbles_vec);
+            assert_eq!(is_leaf_from_compact, is_leaf);
         }
     }
 }
