@@ -1,11 +1,54 @@
+use alloy_primitives::B256;
 use alloy_rlp::{length_of_length, Decodable, Encodable, Error, Result};
 use bytes::Bytes;
+use db::Db;
 
-use crate::nibbles::Nibbles;
+use crate::{
+    nibbles::Nibbles,
+    nodes::{branch::BranchNode, extension::ExtensionNode, node::NodeRef},
+};
 
+use super::node::Node;
+
+#[derive(Clone)]
 pub struct LeafNode {
     pub path: Nibbles,
     pub value: Vec<u8>,
+}
+
+impl LeafNode {
+    pub fn update(&self, path: Nibbles, value: Vec<u8>, db: &mut dyn Db<B256, Vec<u8>>) -> Node {
+        let common_prefix = self.path.common_prefix(&path);
+        // Path is the same
+        if self.path.len() == common_prefix && path.len() == common_prefix {
+            return Node::Leaf(LeafNode { path, value });
+        }
+
+        // We need a branch at common_prefix position
+        let branch = {
+            let branch = BranchNode::default();
+
+            let branch = branch.update(self.path.skip_head(common_prefix), self.value.clone(), db);
+            let Node::Branch(branch) = branch else {
+                panic!("branch was expected")
+            };
+
+            branch.update(path.skip_head(common_prefix), value, db)
+        };
+
+        if common_prefix == 0 {
+            branch
+        } else {
+            let branch_ref = NodeRef::from(branch);
+            if let Err(err) = branch_ref.save(db) {
+                panic!("error saving to db: {}", err);
+            }
+            Node::Extension(ExtensionNode {
+                path: Nibbles::from(&path[..common_prefix]),
+                node: branch_ref,
+            })
+        }
+    }
 }
 
 impl Encodable for LeafNode {
@@ -65,6 +108,7 @@ mod tests {
     #[test]
     fn path_encoding_decoding() {
         for (path, expected) in [
+            (vec![], vec![0xc2, 0x20, 0x80]),
             (vec![0xf], vec![0xc2, 0x3f, 0x80]),
             (vec![0xa, 0xb], vec![0xc4, 0x82, 0x20, 0xab, 0x80]),
             (vec![0xa, 0xb, 0xc], vec![0xc4, 0x82, 0x3a, 0xbc, 0x80]),

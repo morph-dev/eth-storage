@@ -14,6 +14,20 @@ impl<T: AsRef<[u8]>> From<T> for Nibbles {
 }
 
 impl Nibbles {
+    pub fn first(&self) -> Option<usize> {
+        if self.is_empty() {
+            None
+        } else {
+            Some(self[0] as usize)
+        }
+    }
+
+    pub fn skip_head(&self, count: usize) -> Self {
+        Nibbles {
+            nibbles: self.nibbles[count..].into(),
+        }
+    }
+
     pub fn unpack<T: AsRef<[u8]>>(path: T) -> Self {
         Self {
             nibbles: path

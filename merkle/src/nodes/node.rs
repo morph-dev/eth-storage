@@ -8,7 +8,9 @@ use crate::nibbles::Nibbles;
 
 use super::{branch::BranchNode, extension::ExtensionNode, leaf::LeafNode};
 
+#[derive(Clone, Default)]
 pub enum Node {
+    #[default]
     Nil,
     Leaf(LeafNode),
     Extension(ExtensionNode),
@@ -17,14 +19,8 @@ pub enum Node {
 
 impl Node {
     pub fn hash(&self) -> B256 {
-        let encoded = alloy_rlp::encode(&self);
-        keccak256(&encoded)
-    }
-}
-
-impl Default for Node {
-    fn default() -> Self {
-        Node::Nil
+        let encoded = alloy_rlp::encode(self);
+        keccak256(encoded)
     }
 }
 
@@ -76,11 +72,11 @@ impl Decodable for Node {
             17 => {
                 let mut nodes: [NodeRef; 16] = <[NodeRef; 16]>::default();
                 for i in 0..16 {
-                    if payloads[i].len() > 0 {
+                    if !payloads[i].is_empty() {
                         nodes[i] = NodeRef::try_from_bytes(&mut payloads[i].as_ref())?;
                     }
                 }
-                let value = if payloads[16].len() == 0 {
+                let value = if payloads[16].is_empty() {
                     None
                 } else {
                     Some(Vec::from(payloads[16].as_ref()))
@@ -92,9 +88,10 @@ impl Decodable for Node {
     }
 }
 
+#[derive(Clone)]
 pub struct NodeRef {
-    hash: B256,
-    node: Option<Box<Node>>,
+    pub hash: B256,
+    pub node: Option<Box<Node>>,
 }
 
 impl Default for NodeRef {
@@ -105,10 +102,7 @@ impl Default for NodeRef {
 
 impl From<B256> for NodeRef {
     fn from(hash: B256) -> Self {
-        NodeRef {
-            hash: hash,
-            node: None,
-        }
+        NodeRef { hash, node: None }
     }
 }
 
@@ -122,7 +116,42 @@ impl From<Node> for NodeRef {
 }
 
 impl NodeRef {
-    pub fn expand(&mut self, db: &dyn Db<B256, Vec<u8>>) -> Result<()> {
+    pub fn update(
+        &mut self,
+        path: Nibbles,
+        value: Vec<u8>,
+        db: &mut dyn Db<B256, Vec<u8>>,
+    ) -> NodeRef {
+        self.load(db);
+
+        match &self.node {
+            None => panic!("Node should be present"),
+            Some(node) => {
+                let new_node = match node.as_ref() {
+                    Node::Nil => Node::Leaf(LeafNode { path, value }),
+                    Node::Branch(branch) => branch.update(path, value, db),
+                    Node::Extension(extension) => extension.update(path, value, db),
+                    Node::Leaf(leaf) => leaf.update(path, value, db),
+                };
+                NodeRef::from(new_node)
+            }
+        }
+    }
+
+    pub fn save(&self, db: &mut dyn Db<B256, Vec<u8>>) -> Result<()> {
+        match &self.node {
+            None => bail!("Trying to save unknown node"),
+            Some(node) => Ok(db.write(&self.hash, &alloy_rlp::encode(node))?),
+        }
+    }
+
+    pub fn load(&mut self, db: &dyn Db<B256, Vec<u8>>) {
+        if let Err(err) = self.try_load(db) {
+            panic!("{}", err);
+        }
+    }
+
+    pub fn try_load(&mut self, db: &dyn Db<B256, Vec<u8>>) -> Result<()> {
         if self.node.is_some() {
             return Ok(());
         }
@@ -153,11 +182,11 @@ impl NodeRef {
                 })
             }
             32 => Ok(Self {
-                hash: B256::try_from(buf.as_ref())
+                hash: B256::try_from(*buf)
                     .map_err(|_| alloy_rlp::Error::Custom("unknown error converting to B256"))?,
                 node: None,
             }),
-            _  => Err(alloy_rlp::Error::UnexpectedLength),
+            _ => Err(alloy_rlp::Error::UnexpectedLength),
         }
     }
 }
