@@ -1,5 +1,5 @@
 use alloy_primitives::{keccak256, B256};
-use alloy_rlp::{Decodable, Encodable};
+use alloy_rlp::{Decodable, Encodable, EMPTY_STRING_CODE};
 use anyhow::{bail, Result};
 use bytes::Bytes;
 use db::Db;
@@ -9,6 +9,7 @@ use crate::nibbles::Nibbles;
 use super::{branch::BranchNode, extension::ExtensionNode, leaf::LeafNode};
 
 pub enum Node {
+    Nil,
     Leaf(LeafNode),
     Extension(ExtensionNode),
     Branch(BranchNode),
@@ -16,18 +17,21 @@ pub enum Node {
 
 impl Node {
     pub fn hash(&self) -> B256 {
-        let encoded = match &self {
-            Node::Leaf(leaf) => alloy_rlp::encode(leaf),
-            Node::Extension(extension) => alloy_rlp::encode(extension),
-            Node::Branch(branch) => alloy_rlp::encode(branch),
-        };
-        keccak256(encoded)
+        let encoded = alloy_rlp::encode(&self);
+        keccak256(&encoded)
+    }
+}
+
+impl Default for Node {
+    fn default() -> Self {
+        Node::Nil
     }
 }
 
 impl Encodable for Node {
     fn encode(&self, out: &mut dyn bytes::BufMut) {
         match &self {
+            Node::Nil => [].encode(out),
             Node::Leaf(leaf) => leaf.encode(out),
             Node::Extension(extension) => extension.encode(out),
             Node::Branch(branch) => branch.encode(out),
@@ -36,6 +40,7 @@ impl Encodable for Node {
 
     fn length(&self) -> usize {
         match &self {
+            Node::Nil => alloy_rlp::length_of_length(1),
             Node::Leaf(leaf) => leaf.length(),
             Node::Extension(extension) => extension.length(),
             Node::Branch(branch) => branch.length(),
@@ -45,6 +50,9 @@ impl Encodable for Node {
 
 impl Decodable for Node {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        if buf[0] == EMPTY_STRING_CODE {
+            return Ok(Node::Nil);
+        }
         let payloads = Vec::<Bytes>::decode(buf)?;
         match payloads.len() {
             2 => {
@@ -56,7 +64,7 @@ impl Decodable for Node {
                         value: Vec::from(payloads[1].as_ref()),
                     })
                 } else {
-                    let node_ref = NodeRef::try_from_bytes(payloads[1].as_ref())?;
+                    let node_ref = NodeRef::try_from_bytes(&mut payloads[1].as_ref())?;
                     Node::Extension(ExtensionNode {
                         path,
                         node: node_ref,
@@ -66,13 +74,10 @@ impl Decodable for Node {
                 Ok(node)
             }
             17 => {
-                let mut nodes: [Option<NodeRef>; 16] = [
-                    None, None, None, None, None, None, None, None, None, None, None, None, None,
-                    None, None, None,
-                ];
+                let mut nodes: [NodeRef; 16] = <[NodeRef; 16]>::default();
                 for i in 0..16 {
                     if payloads[i].len() > 0 {
-                        nodes[i] = Some(NodeRef::try_from_bytes(&payloads[i])?);
+                        nodes[i] = NodeRef::try_from_bytes(&mut payloads[i].as_ref())?;
                     }
                 }
                 let value = if payloads[16].len() == 0 {
@@ -90,6 +95,12 @@ impl Decodable for Node {
 pub struct NodeRef {
     hash: B256,
     node: Option<Box<Node>>,
+}
+
+impl Default for NodeRef {
+    fn default() -> Self {
+        NodeRef::from(Node::Nil)
+    }
 }
 
 impl From<B256> for NodeRef {
@@ -131,21 +142,22 @@ impl NodeRef {
         Ok(())
     }
 
-    pub fn try_from_bytes(buf: &[u8]) -> alloy_rlp::Result<Self> {
+    pub fn try_from_bytes(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         match buf.len() {
-            l if l == 0 || l > 32 => Err(alloy_rlp::Error::UnexpectedLength),
-            32 => Ok(Self {
-                hash: B256::try_from(buf)
-                    .map_err(|_| alloy_rlp::Error::Custom("unknown error converting to B256"))?,
-                node: None,
-            }),
-            _ => {
-                let inner_node = Node::decode(&mut buf.as_ref())?;
+            0 => Ok(NodeRef::default()),
+            1..=31 => {
+                let inner_node = Node::decode(buf)?;
                 Ok(Self {
                     hash: inner_node.hash(),
                     node: Some(Box::from(inner_node)),
                 })
             }
+            32 => Ok(Self {
+                hash: B256::try_from(buf.as_ref())
+                    .map_err(|_| alloy_rlp::Error::Custom("unknown error converting to B256"))?,
+                node: None,
+            }),
+            _  => Err(alloy_rlp::Error::UnexpectedLength),
         }
     }
 }
