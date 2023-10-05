@@ -6,8 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-alloy-primitives = { version = "0.3.3", default-features = false }
-alloy-rlp = { version = "0.3.3", default-features = false }
+alloy-primitives = "0.3.3"
+alloy-rlp = "0.3.3"
+anyhow = "1.0.75"
 bytes = "1.5.0"
 db = { path = "../db" }
 derive_more = "0.99.17"

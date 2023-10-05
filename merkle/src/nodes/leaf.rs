@@ -4,8 +4,8 @@ use bytes::Bytes;
 use crate::nibbles::Nibbles;
 
 pub struct LeafNode {
-    path: Nibbles,
-    value: Vec<u8>,
+    pub path: Nibbles,
+    pub value: Vec<u8>,
 }
 
 impl Encodable for LeafNode {
