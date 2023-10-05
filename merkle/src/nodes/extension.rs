@@ -22,7 +22,12 @@ impl ExtensionNode {
         }
     }
 
-    pub fn update(&self, path: Nibbles, value: Vec<u8>, db: &mut dyn Db<B256, Vec<u8>>) -> Node {
+    pub fn update(
+        &self,
+        path: Nibbles,
+        value: Vec<u8>,
+        db: &mut Box<dyn Db<B256, Vec<u8>>>,
+    ) -> Node {
         let common_prefix = self.path.common_prefix(&path);
 
         if self.path.len() == common_prefix {

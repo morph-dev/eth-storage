@@ -134,9 +134,9 @@ impl NodeRef {
         &mut self,
         path: Nibbles,
         value: Vec<u8>,
-        db: &mut dyn Db<B256, Vec<u8>>,
+        db: &mut Box<dyn Db<B256, Vec<u8>>>,
     ) -> NodeRef {
-        self.load(db);
+        self.load(db.as_ref());
 
         match &self.node {
             None => panic!("Node should be present"),
@@ -152,7 +152,7 @@ impl NodeRef {
         }
     }
 
-    pub fn save(&self, db: &mut dyn Db<B256, Vec<u8>>) -> Result<()> {
+    pub fn save(&self, db: &mut Box<dyn Db<B256, Vec<u8>>>) -> Result<()> {
         match &self.node {
             None => bail!("Trying to save unknown node"),
             Some(node) => Ok(db.write(&self.hash, &alloy_rlp::encode(node))?),
