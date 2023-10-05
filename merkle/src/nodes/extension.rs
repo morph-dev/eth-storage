@@ -13,6 +13,15 @@ pub struct ExtensionNode {
 }
 
 impl ExtensionNode {
+    pub fn get(&self, path: &Nibbles, db: &dyn Db<B256, Vec<u8>>) -> Option<Vec<u8>> {
+        let common_prefix = self.path.common_prefix(path);
+        if self.path.len() == common_prefix {
+            self.node.clone().get(&path.skip_head(common_prefix), db)
+        } else {
+            None
+        }
+    }
+
     pub fn update(&self, path: Nibbles, value: Vec<u8>, db: &mut dyn Db<B256, Vec<u8>>) -> Node {
         let common_prefix = self.path.common_prefix(&path);
 

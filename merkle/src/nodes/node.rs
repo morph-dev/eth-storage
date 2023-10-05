@@ -116,6 +116,20 @@ impl From<Node> for NodeRef {
 }
 
 impl NodeRef {
+    pub fn get(&mut self, path: &Nibbles, db: &dyn Db<B256, Vec<u8>>) -> Option<Vec<u8>> {
+        self.load(db);
+
+        match &self.node {
+            None => panic!("Node should be present"),
+            Some(node) => match node.as_ref() {
+                Node::Nil => None,
+                Node::Branch(branch) => branch.get(path, db),
+                Node::Extension(extension) => extension.get(path, db),
+                Node::Leaf(leaf) => leaf.get(path, db),
+            },
+        }
+    }
+
     pub fn update(
         &mut self,
         path: Nibbles,

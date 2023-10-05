@@ -23,6 +23,13 @@ impl BranchNode {
         nodes_length + value_length
     }
 
+    pub fn get(&self, path: &Nibbles, db: &dyn Db<B256, Vec<u8>>) -> Option<Vec<u8>> {
+        match path.first() {
+            None => self.value.clone(),
+            Some(nibble) => self.nodes[nibble].clone().get(&path.skip_head(1), db),
+        }
+    }
+
     pub fn update(&self, path: Nibbles, value: Vec<u8>, db: &mut dyn Db<B256, Vec<u8>>) -> Node {
         let mut nodes = self.nodes.clone();
 
