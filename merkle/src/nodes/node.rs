@@ -207,19 +207,28 @@ impl NodeRef {
 
 impl Encodable for NodeRef {
     fn encode(&self, out: &mut dyn bytes::BufMut) {
-        if self.node.is_none() || self.length() == 32 {
+        let Some(node) = &self.node else {
             self.hash.encode(out);
             return;
+        };
+
+        if node.length() < 32 {
+            node.encode(out);
+        } else {
+            self.hash.encode(out);
         }
-        self.node.as_ref().unwrap().encode(out);
     }
 
     fn length(&self) -> usize {
         match self.node.as_ref() {
-            None => 1,
+            None => self.hash.length(),
             Some(node) => {
                 let encoded_length = node.length();
-                std::cmp::min(32, encoded_length)
+                if encoded_length < 32 {
+                    encoded_length
+                } else {
+                    self.hash.length()
+                }
             }
         }
     }

@@ -18,7 +18,7 @@ impl BranchNode {
             .nodes
             .iter()
             .fold(0, |len, node_ref| len + node_ref.length());
-        let value_length = self.value.as_ref().map_or(1, |value| value.length());
+        let value_length = self.value.as_ref().map_or(1, |value| value[..].length());
 
         nodes_length + value_length
     }
