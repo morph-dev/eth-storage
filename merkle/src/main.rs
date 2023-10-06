@@ -1,7 +1,10 @@
+use std::io::{self, Write};
+
+use alloy_primitives::keccak256;
 use anyhow::Result;
 use merkle::{
     history::{Deposit, HistoricalDeposits},
-    AccountState, MerklePatriciaTrie,
+    MerklePatriciaTrie,
 };
 
 fn main() -> Result<()> {
@@ -9,18 +12,27 @@ fn main() -> Result<()> {
 
     let mut mpt = MerklePatriciaTrie::default();
 
-    println!("Creating state trie");
+    use cita_trie::{MemoryDB, PatriciaTrie, Trie};
+    use hasher::HasherKeccak;
+    use std::sync::Arc;
+    let memdb = Arc::new(MemoryDB::new(true));
+    let hasher = Arc::new(HasherKeccak::new());
+    let mut trie = PatriciaTrie::new(Arc::clone(&memdb), Arc::clone(&hasher));
 
-    let block = &history.blocks[0];
-    for Deposit(address, balance) in &block.deposits {
-        mpt.set_account(*address, &AccountState::new(balance));
-        println!("Writing {address}");
-    }
-    println!("State trie created: {}", mpt.get_hash());
+    for block in &history.blocks {
+        print!("Processing block: {:4} ...", block.block);
+        io::stdout().flush()?;
+        for Deposit(address, amount) in &block.deposits {
+            let mut account = mpt.get_account(address).unwrap_or_default();
+            account.balance += amount;
 
-    for Deposit(address, balance) in &block.deposits {
-        let account_state = mpt.get_account(address).map(|state| state.balance);
-        assert_eq!(account_state, Some(*balance));
+            mpt.set_account(*address, &account);
+            trie.insert(keccak256(address).to_vec(), alloy_rlp::encode(&account))?;
+        }
+
+        println!(" state : {}", mpt.get_hash());
+        assert_eq!(block.state_root, mpt.get_hash());
+        assert_eq!(block.state_root.to_vec(), trie.root()?);
     }
 
     Ok(())
