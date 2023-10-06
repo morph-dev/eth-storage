@@ -16,7 +16,7 @@ impl ExtensionNode {
     pub fn get(&self, path: &Nibbles, db: &dyn Db<B256, Vec<u8>>) -> Option<Vec<u8>> {
         let common_prefix = self.path.common_prefix(path);
         if self.path.len() == common_prefix {
-            self.node.clone().get(&path.skip_head(common_prefix), db)
+            self.node.get(&path.skip_head(common_prefix), db)
         } else {
             None
         }
@@ -33,10 +33,7 @@ impl ExtensionNode {
         if self.path.len() == common_prefix {
             return Node::Extension(ExtensionNode {
                 path: self.path.clone(),
-                node: self
-                    .node
-                    .clone()
-                    .update(path.skip_head(common_prefix), value, db),
+                node: self.node.update(path.skip_head(common_prefix), value, db),
             });
         }
 
@@ -45,14 +42,14 @@ impl ExtensionNode {
             let bridge = if common_prefix + 1 == self.path.len() {
                 self.node.clone()
             } else {
-                NodeRef::from(Node::Extension(ExtensionNode {
-                    path: self.path.skip_head(common_prefix + 1),
-                    node: self.node.clone(),
-                }))
+                NodeRef::from(
+                    Node::Extension(ExtensionNode {
+                        path: self.path.skip_head(common_prefix + 1),
+                        node: self.node.clone(),
+                    }),
+                    db,
+                )
             };
-            if let Err(err) = bridge.save(db) {
-                panic!("error saving to db: {}", err);
-            }
 
             let mut branch = BranchNode::default();
 
@@ -64,10 +61,7 @@ impl ExtensionNode {
         if common_prefix == 0 {
             branch
         } else {
-            let branch_ref = NodeRef::from(branch);
-            if let Err(err) = branch_ref.save(db) {
-                panic!("error saving to db: {}", err);
-            }
+            let branch_ref = NodeRef::from(branch, db);
             Node::Extension(ExtensionNode {
                 path: Nibbles::from(&path[..common_prefix]),
                 node: branch_ref,

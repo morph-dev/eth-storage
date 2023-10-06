@@ -1,6 +1,5 @@
 use alloy_primitives::B256;
-use alloy_rlp::{length_of_length, Decodable, Encodable, Error, Result};
-use bytes::Bytes;
+use alloy_rlp::{length_of_length, Encodable};
 use db::Db;
 
 use crate::{
@@ -52,10 +51,7 @@ impl LeafNode {
         if common_prefix == 0 {
             branch
         } else {
-            let branch_ref = NodeRef::from(branch);
-            if let Err(err) = branch_ref.save(db) {
-                panic!("error saving to db: {}", err);
-            }
+            let branch_ref = NodeRef::from(branch, db);
             Node::Extension(ExtensionNode {
                 path: Nibbles::from(&path[..common_prefix]),
                 node: branch_ref,
@@ -87,36 +83,9 @@ impl Encodable for LeafNode {
     }
 }
 
-impl Decodable for LeafNode {
-    fn decode(buf: &mut &[u8]) -> Result<Self> {
-        let encoded_parts = Vec::<Bytes>::decode(buf)?;
-
-        if encoded_parts.len() != 2 {
-            return Err(Error::ListLengthMismatch {
-                expected: 2,
-                got: encoded_parts.len(),
-            });
-        }
-
-        let (path, is_leaf) = Nibbles::from_compact(&encoded_parts[0]);
-        if is_leaf {
-            Ok(LeafNode {
-                path,
-                value: Vec::from(encoded_parts[1].as_ref()),
-            })
-        } else {
-            Err(Error::Custom("Expected leaf"))
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use alloy_rlp::{Decodable, Encodable};
-
-    use crate::nibbles::Nibbles;
-
-    use super::LeafNode;
+    use super::*;
 
     #[test]
     fn path_encoding_decoding() {
@@ -190,9 +159,5 @@ mod tests {
 
         let encoded_leaf = alloy_rlp::encode(&leaf);
         assert_eq!(encoded_leaf, encoded);
-
-        let decoded = LeafNode::decode(&mut encoded.as_ref()).unwrap();
-        assert_eq!(&decoded.path[..], &path);
-        assert_eq!(&decoded.value, &leaf.value);
     }
 }

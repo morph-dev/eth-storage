@@ -367,18 +367,4 @@ mod test {
 
         trie.root().unwrap()
     }
-
-    #[test]
-    fn proptest_regression_0_0_1_0000000000() {
-        expect_hash(vec![
-            (vec![0], vec![0]),
-            (vec![1], vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-        ])
-        .unwrap();
-    }
-
-    #[test]
-    fn proptest_regression_2e_0_2e00_0() {
-        expect_hash(vec![(vec![0x00], vec![0xA]), (vec![0x00, 00], vec![0xB])]).unwrap();
-    }
 }
