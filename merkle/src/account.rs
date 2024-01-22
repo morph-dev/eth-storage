@@ -1,9 +1,10 @@
 use alloy_primitives::{keccak256, B256, U256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
+use serde::{Serialize, Deserialize};
 
 use crate::nodes::node::NodeRef;
 
-#[derive(Clone, RlpEncodable, RlpDecodable)]
+#[derive(Clone, RlpEncodable, RlpDecodable, Serialize, Deserialize)]
 pub struct AccountState {
     pub nonce: u64,
     pub balance: U256,

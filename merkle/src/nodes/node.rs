@@ -8,7 +8,7 @@ use crate::{nibbles::Nibbles, nodes::decode::RlpStructure};
 
 use super::{branch::BranchNode, extension::ExtensionNode, leaf::LeafNode};
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub enum Node {
     #[default]
     Nil,
@@ -91,6 +91,7 @@ impl Decodable for Node {
     }
 }
 
+#[derive(Debug)]
 pub struct NodeRef {
     pub hash: B256,
     pub node: Option<Box<Node>>,

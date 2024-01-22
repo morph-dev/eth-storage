@@ -1,6 +1,6 @@
 use derive_more::{Deref, Index};
 
-#[derive(Clone, Deref, Index)]
+#[derive(Clone, Deref, Index, Debug)]
 pub struct Nibbles {
     nibbles: Vec<u8>,
 }

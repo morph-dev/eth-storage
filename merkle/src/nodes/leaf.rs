@@ -9,7 +9,7 @@ use crate::{
 
 use super::node::Node;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LeafNode {
     pub path: Nibbles,
     pub value: Vec<u8>,

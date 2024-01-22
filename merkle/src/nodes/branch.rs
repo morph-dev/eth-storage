@@ -6,7 +6,7 @@ use crate::nibbles::Nibbles;
 
 use super::node::{Node, NodeRef};
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct BranchNode {
     pub nodes: [NodeRef; 16],
     pub value: Option<Vec<u8>>,

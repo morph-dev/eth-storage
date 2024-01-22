@@ -9,8 +9,8 @@ use crate::{
 };
 
 pub struct MerklePatriciaTrie {
-    root: NodeRef,
-    db: Box<dyn Db<B256, Vec<u8>>>,
+    pub root: NodeRef,
+    pub db: Box<dyn Db<B256, Vec<u8>>>,
 }
 
 impl Default for MerklePatriciaTrie {

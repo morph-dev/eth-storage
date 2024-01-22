@@ -6,7 +6,7 @@ use crate::{nibbles::Nibbles, nodes::branch::BranchNode};
 
 use super::node::{Node, NodeRef};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ExtensionNode {
     pub path: Nibbles,
     pub node: NodeRef,
