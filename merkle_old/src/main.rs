@@ -2,7 +2,7 @@ use std::io::{self, Write};
 
 use alloy_primitives::keccak256;
 use anyhow::Result;
-use merkle::{
+use merkle_old::{
     history::{Deposit, HistoricalDeposits},
     MerklePatriciaTrie,
 };
