@@ -9,9 +9,6 @@ pub(crate) enum RlpStructure {
 
 impl Decodable for RlpStructure {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        if buf[0] < EMPTY_STRING_CODE {
-            return Ok(Self::Value(buf.copy_to_bytes(1)));
-        }
         let header = Header::decode(buf)?;
 
         if header.list {

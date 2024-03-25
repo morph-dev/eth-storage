@@ -1,5 +1,5 @@
 use alloy_primitives::{keccak256, B256};
-use alloy_rlp::{Decodable, Encodable, EMPTY_STRING_CODE};
+use alloy_rlp::{Decodable, Encodable};
 use anyhow::{bail, Result};
 use bytes::Bytes;
 use db::Db;
@@ -46,12 +46,15 @@ impl Encodable for Node {
 
 impl Decodable for Node {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        if buf[0] == EMPTY_STRING_CODE {
-            return Ok(Node::Nil);
-        }
-
-        let RlpStructure::List(payloads) = RlpStructure::decode(buf)? else {
-            return Err(alloy_rlp::Error::UnexpectedString);
+        let payloads = match RlpStructure::decode(buf)? {
+            RlpStructure::List(payloads) => payloads,
+            RlpStructure::Value(value) => {
+                return if value.is_empty() {
+                    Ok(Node::Nil)
+                } else {
+                    Err(alloy_rlp::Error::UnexpectedString)
+                };
+            }
         };
         match payloads.len() {
             2 => {
