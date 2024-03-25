@@ -1,5 +1,5 @@
 [workspace]
-members = [ "db", "merkle_old", "verkle" ]
+members = [ "db", "merkle_old", "merkle", "verkle" ]
 resolver = "2"
 
 [profile.bench]
