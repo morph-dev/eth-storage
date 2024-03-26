@@ -15,14 +15,14 @@ impl<K, V> MemoryDb<K, V> {
     }
 }
 
-impl<K: Hash + Eq, V> Db<K, V> for MemoryDb<K, V> {
+impl<K: Hash + Eq, V: Clone> Db<K, V> for MemoryDb<K, V> {
     fn write(&mut self, key: K, value: V) -> Result<(), DbError> {
         self.data.insert(key, value);
         Ok(())
     }
 
-    fn read(&self, key: &K) -> Result<Option<&V>, DbError> {
-        Ok(self.data.get(key))
+    fn read(&self, key: &K) -> Result<Option<V>, DbError> {
+        Ok(self.data.get(key).cloned())
     }
 }
 
@@ -45,7 +45,7 @@ mod tests {
         let key = [1u8, 2, 3, 4];
         let value = [1u16, 1, 2, 3, 5, 8, 13, 21];
         assert_ok!(memory_db.write(key, value.clone()));
-        assert_ok_eq!(memory_db.read(&key), Some(&value));
+        assert_ok_eq!(memory_db.read(&key), Some(value));
     }
 
     #[test]
@@ -56,9 +56,9 @@ mod tests {
         let value2 = [1u16, 1, 2, 3, 5, 8, 13, 21];
 
         assert_ok!(memory_db.write(key, value1.clone()));
-        assert_ok_eq!(memory_db.read(&key), Some(&value1));
+        assert_ok_eq!(memory_db.read(&key), Some(value1));
 
         assert_ok!(memory_db.write(key, value2.clone()));
-        assert_ok_eq!(memory_db.read(&key), Some(&value2));
+        assert_ok_eq!(memory_db.read(&key), Some(value2));
     }
 }
