@@ -3,19 +3,19 @@ use derive_more::{AsRef, Deref, Index};
 use once_cell::sync::Lazy;
 use sha2::{Digest, Sha256};
 
-const BASIS_LENGTH: usize = 256;
+use crate::constants::VERKLE_NODE_WIDTH;
 
 const PEDERSEN_SEED: &[u8] = b"eth_verkle_oct_2021";
 
-pub static CRS: Lazy<Basis> = Lazy::new(Basis::new);
+pub static CRS: Lazy<Bases> = Lazy::new(Bases::new);
 
 #[derive(AsRef, Deref, Index)]
-pub struct Basis([Element; BASIS_LENGTH]);
+pub struct Bases([Element; VERKLE_NODE_WIDTH]);
 
-impl Basis {
+impl Bases {
     fn new() -> Self {
         let mut generated_elements = 0;
-        let mut elements = [Element::zero(); BASIS_LENGTH];
+        let mut elements = [Element::zero(); VERKLE_NODE_WIDTH];
 
         for i in 0u64.. {
             if generated_elements == elements.len() {
