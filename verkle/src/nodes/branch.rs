@@ -64,7 +64,7 @@ impl Default for BranchNode {
 }
 
 impl NodeTrait for BranchNode {
-    fn commit(&self) -> Fr {
+    fn commitment(&self) -> Fr {
         self.cp.map_to_scalar_field()
     }
 }
@@ -83,7 +83,7 @@ impl Encode for BranchNode {
                 if node.is_empty() {
                     None
                 } else {
-                    Some((index as u8, fr_to_b256(&node.commit())))
+                    Some((index as u8, fr_to_b256(&node.commitment())))
                 }
             })
             .collect();
@@ -115,7 +115,7 @@ impl Decode for BranchNode {
             commitments
                 .get(&i)
                 .map(|c| Node::Commitment(*c))
-                .unwrap_or_default()
+                .unwrap_or_else(|| Node::Empty)
         });
         let cp = DEFAULT_COMMITER.commit_sparse(commitments.into_iter().collect());
 

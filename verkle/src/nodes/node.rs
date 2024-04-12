@@ -10,16 +10,14 @@ use crate::{Db, TrieKey, TrieValue};
 use super::{BranchNode, LeafNode};
 
 pub trait NodeTrait {
-    fn commit(&self) -> Fr;
+    fn commitment(&self) -> Fr;
 
-    fn commit_mut(&mut self) -> Fr {
-        self.commit()
+    fn commit(&mut self) -> Fr {
+        self.commitment()
     }
 }
 
-#[derive(Default)]
 pub enum Node {
-    #[default]
     Empty,
     Branch(BranchNode),
     Leaf(LeafNode),
@@ -27,20 +25,20 @@ pub enum Node {
 }
 
 impl NodeTrait for Node {
-    fn commit(&self) -> Fr {
+    fn commitment(&self) -> Fr {
         match self {
             Node::Empty => Fr::zero(),
-            Node::Branch(branch_node) => branch_node.commit(),
-            Node::Leaf(leaf_node) => leaf_node.commit(),
+            Node::Branch(branch_node) => branch_node.commitment(),
+            Node::Leaf(leaf_node) => leaf_node.commitment(),
             Node::Commitment(c) => *c,
         }
     }
 
-    fn commit_mut(&mut self) -> Fr {
+    fn commit(&mut self) -> Fr {
         match self {
             Node::Empty => Fr::zero(),
-            Node::Branch(branch_node) => branch_node.commit_mut(),
-            Node::Leaf(leaf_node) => leaf_node.commit_mut(),
+            Node::Branch(branch_node) => branch_node.commit(),
+            Node::Leaf(leaf_node) => leaf_node.commit(),
             Node::Commitment(c) => *c,
         }
     }
@@ -52,12 +50,12 @@ impl Node {
     }
 
     pub fn check(&self, commitment: &Fr) -> Result<()> {
-        if &self.commit() == commitment {
+        if &self.commitment() == commitment {
             Ok(())
         } else {
             Err(anyhow!(
                 "Node's commitment {:?} doesn't match expected {commitment:?}",
-                self.commit()
+                self.commitment()
             ))
         }
     }
@@ -102,7 +100,7 @@ impl Node {
                 } else {
                     let mut branch_node = BranchNode::new();
                     branch_node.set(
-                        key[depth] as usize,
+                        leaf_node.stem()[depth] as usize,
                         Node::Leaf(mem::replace(
                             leaf_node,
                             LeafNode::new(TrieKey(B256::ZERO).stem()),
