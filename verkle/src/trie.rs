@@ -1,8 +1,9 @@
-use alloy_primitives::B256;
+use alloy_primitives::{keccak256, Address, B256, U256};
 use anyhow::Result;
 use banderwagon::Fr;
 
 use crate::{
+    account::AccountStorageLayout,
     nodes::{BranchNode, Node},
     utils::{b256_to_fr, fr_to_b256},
     Db, TrieKey, TrieValue,
@@ -44,6 +45,43 @@ impl Trie {
 
     pub fn root_hash_commitment(&mut self) -> Result<Fr> {
         self.root.write_and_commit(self.db.as_mut())
+    }
+
+    pub fn create_eoa(&mut self, address: Address, balance: U256, nonce: u64) -> Result<()> {
+        let storage = AccountStorageLayout::new(address);
+        self.insert(storage.version_key(), TrieValue::ZERO)?;
+        self.insert(storage.balance_key(), balance)?;
+        self.insert(storage.nonce_key(), TrieValue::from(nonce))?;
+        self.insert(
+            storage.code_hash_key(),
+            TrieValue::from_le_slice(
+                hex::decode("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")?
+                    .as_slice(),
+            ),
+        )?;
+        Ok(())
+    }
+
+    pub fn create_sc(
+        &mut self,
+        address: Address,
+        balance: U256,
+        nonce: u64,
+        code: Vec<u8>,
+    ) -> Result<()> {
+        let storage = AccountStorageLayout::new(address);
+        self.insert(storage.version_key(), TrieValue::ZERO)?;
+        self.insert(storage.balance_key(), balance)?;
+        self.insert(storage.nonce_key(), TrieValue::from(nonce))?;
+        self.insert(
+            storage.code_hash_key(),
+            TrieValue::from_le_bytes(keccak256(&code).0),
+        )?;
+        self.insert(storage.code_size_key(), TrieValue::from(code.len()))?;
+        for (chunk_key, chunk_value) in storage.chunkify_code(&code) {
+            self.insert(chunk_key, chunk_value)?;
+        }
+        Ok(())
     }
 }
 

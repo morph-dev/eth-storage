@@ -3,16 +3,24 @@ use ssz::{Decode, Encode};
 
 use crate::TrieKey;
 
-const STEM_LENGTH: usize = 31;
-
 #[derive(PartialEq, Eq, AsRef, Deref, Index)]
-pub struct Stem([u8; STEM_LENGTH]);
+pub struct Stem([u8; Self::STEM_LENGTH]);
+
+impl Stem {
+    const STEM_LENGTH: usize = 31;
+}
 
 impl From<&TrieKey> for Stem {
     fn from(key: &TrieKey) -> Self {
-        let mut stem = [0u8; STEM_LENGTH];
-        stem.copy_from_slice(&key[..STEM_LENGTH]);
+        let mut stem = [0u8; Self::STEM_LENGTH];
+        stem.copy_from_slice(&key[..Self::STEM_LENGTH]);
         Stem(stem)
+    }
+}
+
+impl From<TrieKey> for Stem {
+    fn from(key: TrieKey) -> Self {
+        Self::from(&key)
     }
 }
 
@@ -22,7 +30,7 @@ impl Encode for Stem {
     }
 
     fn ssz_fixed_len() -> usize {
-        STEM_LENGTH
+        Self::STEM_LENGTH
     }
 
     fn ssz_append(&self, buf: &mut Vec<u8>) {
@@ -30,7 +38,7 @@ impl Encode for Stem {
     }
 
     fn ssz_bytes_len(&self) -> usize {
-        STEM_LENGTH
+        Self::STEM_LENGTH
     }
 }
 
@@ -40,7 +48,7 @@ impl Decode for Stem {
     }
 
     fn ssz_fixed_len() -> usize {
-        STEM_LENGTH
+        Self::STEM_LENGTH
     }
 
     fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
@@ -48,7 +56,7 @@ impl Decode for Stem {
             Ok(stem) => Ok(Self(stem)),
             Err(_) => Err(ssz::DecodeError::InvalidByteLength {
                 len: bytes.len(),
-                expected: STEM_LENGTH,
+                expected: Self::STEM_LENGTH,
             }),
         }
     }

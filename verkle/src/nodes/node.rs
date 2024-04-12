@@ -10,10 +10,10 @@ use crate::{Db, TrieKey, TrieValue};
 use super::{BranchNode, LeafNode};
 
 pub trait NodeTrait {
-    fn commitment(&self) -> Fr;
+    fn hash_commitment(&self) -> Fr;
 
     fn commit(&mut self) -> Fr {
-        self.commitment()
+        self.hash_commitment()
     }
 }
 
@@ -25,11 +25,11 @@ pub enum Node {
 }
 
 impl NodeTrait for Node {
-    fn commitment(&self) -> Fr {
+    fn hash_commitment(&self) -> Fr {
         match self {
             Node::Empty => Fr::zero(),
-            Node::Branch(branch_node) => branch_node.commitment(),
-            Node::Leaf(leaf_node) => leaf_node.commitment(),
+            Node::Branch(branch_node) => branch_node.hash_commitment(),
+            Node::Leaf(leaf_node) => leaf_node.hash_commitment(),
             Node::Commitment(c) => *c,
         }
     }
@@ -50,12 +50,12 @@ impl Node {
     }
 
     pub fn check(&self, commitment: &Fr) -> Result<()> {
-        if &self.commitment() == commitment {
+        if &self.hash_commitment() == commitment {
             Ok(())
         } else {
             Err(anyhow!(
                 "Node's commitment {:?} doesn't match expected {commitment:?}",
-                self.commitment()
+                self.hash_commitment()
             ))
         }
     }

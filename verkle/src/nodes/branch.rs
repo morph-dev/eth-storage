@@ -64,7 +64,7 @@ impl Default for BranchNode {
 }
 
 impl NodeTrait for BranchNode {
-    fn commitment(&self) -> Fr {
+    fn hash_commitment(&self) -> Fr {
         self.cp.map_to_scalar_field()
     }
 }
@@ -83,7 +83,7 @@ impl Encode for BranchNode {
                 if node.is_empty() {
                     None
                 } else {
-                    Some((index as u8, fr_to_b256(&node.commitment())))
+                    Some((index as u8, fr_to_b256(&node.hash_commitment())))
                 }
             })
             .collect();

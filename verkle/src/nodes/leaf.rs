@@ -63,13 +63,12 @@ impl LeafNode {
         &self.stem
     }
 
-    fn calculate_commitment(&self) -> Fr {
-        let c = self.const_cp
+    fn calculate_commitment(&self) -> Element {
+        self.const_cp
             + DEFAULT_COMMITER.commit_sparse(vec![
                 (2, self.cp1.map_to_scalar_field()),
                 (3, self.cp2.map_to_scalar_field()),
-            ]);
-        c.map_to_scalar_field()
+            ])
     }
 
     pub fn get(&self, index: u8) -> Option<&TrieValue> {
@@ -119,12 +118,13 @@ impl LeafNode {
 }
 
 impl NodeTrait for LeafNode {
-    fn commitment(&self) -> Fr {
-        self.c.unwrap_or_else(|| self.calculate_commitment())
+    fn hash_commitment(&self) -> Fr {
+        self.c
+            .unwrap_or_else(|| self.calculate_commitment().map_to_scalar_field())
     }
 
     fn commit(&mut self) -> Fr {
-        self.c = self.c.or_else(|| Some(self.calculate_commitment()));
+        self.c = Some(self.hash_commitment());
         self.c.expect("Value must be present")
     }
 }
