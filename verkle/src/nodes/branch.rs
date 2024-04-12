@@ -1,4 +1,4 @@
-use std::{array, collections::BTreeMap, ops::DerefMut};
+use std::collections::BTreeMap;
 
 use alloy_primitives::B256;
 use anyhow::Result;
@@ -7,53 +7,74 @@ use ssz::{Decode, Encode};
 
 use crate::{
     committer::DEFAULT_COMMITER,
-    constants::VERKLE_NODE_WIDTH,
     utils::{b256_to_fr, fr_to_b256},
     Db, TrieKey, TrieValue,
 };
 
-use super::{node::NodeTrait, Node};
+use super::{node::NodeTrait, LeafNode, Node};
 
 pub struct BranchNode {
-    values: Box<[Node; VERKLE_NODE_WIDTH]>,
-    cp: Element,
+    values: BTreeMap<u8, Node>,
+    commitment: Element,
 }
 
 impl BranchNode {
     pub fn new() -> Self {
         Self {
-            values: array::from_fn(|_| Node::Empty).into(),
-            cp: Element::zero(),
+            values: BTreeMap::new(),
+            commitment: Element::zero(),
         }
     }
 
-    pub fn set(&mut self, index: usize, node: Node) {
-        let node_at_index = &mut self.values[index];
-        let pre_commitment = node_at_index.commit();
-        *node_at_index = node;
-        let post_commitment = node_at_index.commit();
-        self.cp += DEFAULT_COMMITER.scalar_mul(index, post_commitment - pre_commitment);
+    pub fn set(&mut self, index: u8, node: Node) {
+        let old_node = self.values.insert(index, node);
+        self.update_commitment(
+            index,
+            old_node
+                .map(|node| node.hash_commitment())
+                .unwrap_or_default(),
+        );
     }
 
-    pub(super) fn get_mut(&mut self, index: usize) -> &mut Node {
-        &mut self.values[index]
+    pub(super) fn get_mut(&mut self, index: u8) -> Option<&mut Node> {
+        self.values.get_mut(&index)
     }
 
     pub fn insert(&mut self, depth: usize, key: TrieKey, value: TrieValue, db: &Db) -> Result<()> {
-        let index = key[depth] as usize;
-        let node = &mut self.values[index];
-        let pre_commitment = node.commit();
-        node.insert(depth + 1, key, value, db)?;
-        let post_commitment = node.commit();
-        self.cp += DEFAULT_COMMITER.scalar_mul(index, post_commitment - pre_commitment);
+        let index = key[depth];
+        let pre_commitment = self.get_child_commit(index);
+        match self.values.get_mut(&index) {
+            Some(node) => {
+                node.insert(depth + 1, key, value, db)?;
+                node.hash_commitment_mut();
+            }
+            None => {
+                self.values
+                    .insert(index, Node::Leaf(LeafNode::new_for_key_value(&key, value)));
+            }
+        };
+        self.update_commitment(index, pre_commitment);
         Ok(())
     }
 
+    fn get_child_commit(&mut self, index: u8) -> Fr {
+        self.values
+            .get_mut(&index)
+            .map(|node| node.hash_commitment_mut())
+            .unwrap_or_default()
+    }
+
+    fn update_commitment(&mut self, index: u8, pre_commitment: Fr) {
+        let post_commitment = self.get_child_commit(index);
+        self.commitment +=
+            DEFAULT_COMMITER.scalar_mul(index as usize, post_commitment - pre_commitment);
+    }
+
     pub fn write_and_commit(&mut self, db: &mut Db) -> Result<Fr> {
-        for node in self.values.deref_mut() {
+        for (_, node) in self.values.iter_mut() {
             node.write_and_commit(db)?;
         }
-        Ok(self.commit())
+        Ok(self.hash_commitment_mut())
     }
 }
 
@@ -65,7 +86,7 @@ impl Default for BranchNode {
 
 impl NodeTrait for BranchNode {
     fn hash_commitment(&self) -> Fr {
-        self.cp.map_to_scalar_field()
+        self.commitment.map_to_scalar_field()
     }
 }
 
@@ -78,14 +99,7 @@ impl Encode for BranchNode {
         let commitments: BTreeMap<u8, B256> = self
             .values
             .iter()
-            .enumerate()
-            .filter_map(|(index, node)| {
-                if node.is_empty() {
-                    None
-                } else {
-                    Some((index as u8, fr_to_b256(&node.hash_commitment())))
-                }
-            })
+            .map(|(index, node)| (*index, fr_to_b256(&node.hash_commitment())))
             .collect();
         commitments.ssz_append(buf);
     }
@@ -106,22 +120,19 @@ impl Decode for BranchNode {
 
     fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
         let commitments = BTreeMap::<u8, B256>::from_ssz_bytes(bytes)?;
-        let commitments: BTreeMap<usize, Fr> = commitments
+
+        let values = commitments
             .iter()
-            .map(|(index, commitment)| (*index as usize, b256_to_fr(commitment)))
+            .map(|(index, c)| (*index, Node::Commitment(b256_to_fr(c))))
             .collect();
 
-        let values = array::from_fn(|i| {
+        let commitment = DEFAULT_COMMITER.commit_sparse(
             commitments
-                .get(&i)
-                .map(|c| Node::Commitment(*c))
-                .unwrap_or_else(|| Node::Empty)
-        });
-        let cp = DEFAULT_COMMITER.commit_sparse(commitments.into_iter().collect());
+                .iter()
+                .map(|(index, commitment)| (*index as usize, b256_to_fr(commitment)))
+                .collect(),
+        );
 
-        Ok(Self {
-            values: values.into(),
-            cp,
-        })
+        Ok(Self { values, commitment })
     }
 }

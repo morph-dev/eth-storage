@@ -27,14 +27,14 @@ pub struct LeafNode {
     values: BTreeMap<u8, TrieValue>,
 
     #[ssz(skip_serializing)]
-    cp1: Element,
+    c1: Element,
     #[ssz(skip_serializing)]
-    cp2: Element,
+    c2: Element,
 
     #[ssz(skip_serializing)]
-    const_cp: Element,
+    const_c: Element,
     #[ssz(skip_serializing)]
-    c: Option<Fr>,
+    hash_commitment: Option<Fr>,
 }
 
 impl LeafNode {
@@ -46,10 +46,10 @@ impl LeafNode {
         Self {
             stem,
             values: BTreeMap::new(),
-            cp1: Element::zero(),
-            cp2: Element::zero(),
-            const_cp: const_c,
-            c: None,
+            c1: Element::zero(),
+            c2: Element::zero(),
+            const_c,
+            hash_commitment: None,
         }
     }
 
@@ -64,10 +64,10 @@ impl LeafNode {
     }
 
     fn calculate_commitment(&self) -> Element {
-        self.const_cp
+        self.const_c
             + DEFAULT_COMMITER.commit_sparse(vec![
-                (2, self.cp1.map_to_scalar_field()),
-                (3, self.cp2.map_to_scalar_field()),
+                (2, self.c1.map_to_scalar_field()),
+                (3, self.c2.map_to_scalar_field()),
             ])
     }
 
@@ -95,11 +95,11 @@ impl LeafNode {
             + CRS[high_index] * (value_high_16 - old_value_high_16);
 
         if index < VERKLE_NODE_WIDTH / 2 {
-            self.cp1 += diff;
+            self.c1 += diff;
         } else {
-            self.cp2 += diff;
+            self.c2 += diff;
         };
-        self.c = None;
+        self.hash_commitment = None;
     }
 
     pub fn set_all(&mut self, values: impl IntoIterator<Item = (u8, TrieValue)>) {
@@ -119,13 +119,13 @@ impl LeafNode {
 
 impl NodeTrait for LeafNode {
     fn hash_commitment(&self) -> Fr {
-        self.c
+        self.hash_commitment
             .unwrap_or_else(|| self.calculate_commitment().map_to_scalar_field())
     }
 
-    fn commit(&mut self) -> Fr {
-        self.c = Some(self.hash_commitment());
-        self.c.expect("Value must be present")
+    fn hash_commitment_mut(&mut self) -> Fr {
+        self.hash_commitment = Some(self.hash_commitment());
+        self.hash_commitment.expect("Value must be present")
     }
 }
 
@@ -163,7 +163,7 @@ mod tests {
         let mut leaf = LeafNode::new_for_key_value(&key, TrieValue::ZERO);
 
         assert_eq!(
-            fr_to_b256(&leaf.commit()).to_string(),
+            fr_to_b256(&leaf.hash_commitment_mut()).to_string(),
             "0x1c0727f0c6c9887189f75a9d08b804aba20892a238e147750767eac22a830d08"
         );
     }
@@ -174,7 +174,7 @@ mod tests {
         let mut leaf = LeafNode::new_for_key_value(&key, TrieValue::from(1));
 
         assert_eq!(
-            fr_to_b256(&leaf.commit()).to_string(),
+            fr_to_b256(&leaf.hash_commitment_mut()).to_string(),
             "0x6ef020caaeda01ff573afe6df6460d4aae14b4987e02ea39074f270ce62dfc14"
         );
     }
@@ -189,7 +189,7 @@ mod tests {
         let mut leaf = LeafNode::new_for_key_value(&key, TrieValue::from_le_bytes(bytes));
 
         assert_eq!(
-            fr_to_b256(&leaf.commit()).to_string(),
+            fr_to_b256(&leaf.hash_commitment_mut()).to_string(),
             "0xb897ba52c5317acd75f5f3c3922f461357d4fb8b685fe63f20a3b2adb014370a"
         );
     }
@@ -231,7 +231,7 @@ mod tests {
         );
 
         assert_eq!(
-            fr_to_b256(&leaf.commit()).to_string(),
+            fr_to_b256(&leaf.hash_commitment_mut()).to_string(),
             "0xcc30be1f0d50eacfacaa3361b8df4d2014a849854a6cf35e6c55e07d6963f519"
         );
     }

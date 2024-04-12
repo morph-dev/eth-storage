@@ -2,7 +2,7 @@ use std::mem;
 
 use alloy_primitives::B256;
 use anyhow::{anyhow, bail, Result};
-use banderwagon::{Fr, Zero};
+use banderwagon::Fr;
 use ssz::{Decode, Encode};
 
 use crate::{Db, TrieKey, TrieValue};
@@ -12,13 +12,12 @@ use super::{BranchNode, LeafNode};
 pub trait NodeTrait {
     fn hash_commitment(&self) -> Fr;
 
-    fn commit(&mut self) -> Fr {
+    fn hash_commitment_mut(&mut self) -> Fr {
         self.hash_commitment()
     }
 }
 
 pub enum Node {
-    Empty,
     Branch(BranchNode),
     Leaf(LeafNode),
     Commitment(Fr),
@@ -27,26 +26,24 @@ pub enum Node {
 impl NodeTrait for Node {
     fn hash_commitment(&self) -> Fr {
         match self {
-            Node::Empty => Fr::zero(),
             Node::Branch(branch_node) => branch_node.hash_commitment(),
             Node::Leaf(leaf_node) => leaf_node.hash_commitment(),
             Node::Commitment(c) => *c,
         }
     }
 
-    fn commit(&mut self) -> Fr {
+    fn hash_commitment_mut(&mut self) -> Fr {
         match self {
-            Node::Empty => Fr::zero(),
-            Node::Branch(branch_node) => branch_node.commit(),
-            Node::Leaf(leaf_node) => leaf_node.commit(),
+            Node::Branch(branch_node) => branch_node.hash_commitment_mut(),
+            Node::Leaf(leaf_node) => leaf_node.hash_commitment_mut(),
             Node::Commitment(c) => *c,
         }
     }
 }
 
 impl Node {
-    pub fn is_empty(&self) -> bool {
-        matches!(self, Node::Empty)
+    pub fn new() -> Self {
+        Self::Branch(BranchNode::new())
     }
 
     pub fn check(&self, commitment: &Fr) -> Result<()> {
@@ -65,9 +62,11 @@ impl Node {
         let mut node = self;
         loop {
             match node {
-                Node::Empty => return Ok(None),
                 Node::Branch(branch_node) => {
-                    node = branch_node.get_mut(key[depth] as usize);
+                    node = match branch_node.get_mut(key[depth]) {
+                        Some(node) => node,
+                        None => return Ok(None),
+                    };
                     depth += 1;
                 }
                 Node::Leaf(leaf_node) => {
@@ -92,7 +91,6 @@ impl Node {
 
     pub fn insert(&mut self, depth: usize, key: TrieKey, value: TrieValue, db: &Db) -> Result<()> {
         match self {
-            Node::Empty => *self = Node::Leaf(LeafNode::new_for_key_value(&key, value)),
             Node::Branch(branch_node) => branch_node.insert(depth, key, value, db)?,
             Node::Leaf(leaf_node) => {
                 if leaf_node.stem() == &key.stem() {
@@ -100,7 +98,7 @@ impl Node {
                 } else {
                     let mut branch_node = BranchNode::new();
                     branch_node.set(
-                        leaf_node.stem()[depth] as usize,
+                        leaf_node.stem()[depth],
                         Node::Leaf(mem::replace(
                             leaf_node,
                             LeafNode::new(TrieKey(B256::ZERO).stem()),
@@ -129,19 +127,25 @@ impl Node {
         match self {
             Node::Branch(branch_node) => {
                 branch_node.write_and_commit(db)?;
-                let c = branch_node.commit();
+                let c = branch_node.hash_commitment_mut();
                 db.write(c, self.as_ssz_bytes())?;
                 *self = Node::Commitment(c);
                 Ok(c)
             }
             Node::Leaf(leaf_node) => {
-                let c = leaf_node.commit();
+                let c = leaf_node.hash_commitment_mut();
                 db.write(c, self.as_ssz_bytes())?;
                 *self = Node::Commitment(c);
                 Ok(c)
             }
-            _ => Ok(self.commit()),
+            _ => Ok(self.hash_commitment_mut()),
         }
+    }
+}
+
+impl Default for Node {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -163,7 +167,6 @@ impl Encode for Node {
                 buf.push(SSZ_TAG_LEAF);
                 leaf_node.ssz_append(buf);
             }
-            Node::Empty => panic!("Can't encode Empty node"),
             Node::Commitment(_) => panic!("Can't encode Commitment node"),
         }
     }
@@ -172,7 +175,6 @@ impl Encode for Node {
         match self {
             Node::Branch(branch_node) => 1 + branch_node.ssz_bytes_len(),
             Node::Leaf(leaf_node) => 1 + leaf_node.ssz_bytes_len(),
-            Node::Empty => panic!("Can't encode Empty node"),
             Node::Commitment(_) => panic!("Can't encode Commitment node"),
         }
     }

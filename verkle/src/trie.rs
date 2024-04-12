@@ -4,7 +4,7 @@ use banderwagon::Fr;
 
 use crate::{
     account::AccountStorageLayout,
-    nodes::{BranchNode, Node},
+    nodes::Node,
     utils::{b256_to_fr, fr_to_b256},
     Db, TrieKey, TrieValue,
 };
@@ -17,7 +17,7 @@ pub struct Trie {
 impl Trie {
     pub fn new(db: Box<Db>) -> Self {
         Self {
-            root: Node::Branch(BranchNode::new()),
+            root: Node::new(),
             db,
         }
     }
