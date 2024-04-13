@@ -3,8 +3,8 @@ use anyhow::Result;
 use banderwagon::Fr;
 
 use crate::{
-    account::AccountStorageLayout,
     nodes::Node,
+    storage::AccountStorageLayout,
     utils::{b256_to_fr, fr_to_b256},
     Db, TrieKey, TrieValue,
 };

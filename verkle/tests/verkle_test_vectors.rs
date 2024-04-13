@@ -6,7 +6,7 @@ mod verkle_test_vectors {
     use anyhow::Result;
     use banderwagon::{CanonicalDeserialize, Element, Fr};
     use db::memory_db::MemoryDb;
-    use verkle::{account::AccountStorageLayout, Trie, TrieValue};
+    use verkle::{storage::AccountStorageLayout, Trie, TrieValue};
 
     fn element_to_fr(str: &str) -> Fr {
         Element::deserialize_compressed(hex::decode(str).unwrap().as_slice())

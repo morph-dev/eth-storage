@@ -5,12 +5,12 @@ use banderwagon::Fr;
 use stem::Stem;
 pub use trie::Trie;
 
-pub mod account;
 mod committer;
 mod constants;
 pub mod crs;
 pub mod nodes;
 pub mod stem;
+pub mod storage;
 pub mod trie;
 mod utils;
 
