@@ -44,7 +44,7 @@ mod tests {
         let mut memory_db: MemoryDb<[u8; 4], [u16; 8]> = MemoryDb::new();
         let key = [1u8, 2, 3, 4];
         let value = [1u16, 1, 2, 3, 5, 8, 13, 21];
-        assert_ok!(memory_db.write(key, value.clone()));
+        assert_ok!(memory_db.write(key, value));
         assert_ok_eq!(memory_db.read(&key), Some(value));
     }
 
@@ -55,10 +55,10 @@ mod tests {
         let value1 = [0u16, 1, 1, 2, 3, 5, 8, 13];
         let value2 = [1u16, 1, 2, 3, 5, 8, 13, 21];
 
-        assert_ok!(memory_db.write(key, value1.clone()));
+        assert_ok!(memory_db.write(key, value1));
         assert_ok_eq!(memory_db.read(&key), Some(value1));
 
-        assert_ok!(memory_db.write(key, value2.clone()));
+        assert_ok!(memory_db.write(key, value2));
         assert_ok_eq!(memory_db.read(&key), Some(value2));
     }
 }

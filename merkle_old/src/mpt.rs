@@ -131,9 +131,9 @@ mod test {
         tree.set_raw(b"first", b"value".to_vec());
         tree.set_raw(b"second", b"value".to_vec());
 
-        let first = tree.get_raw(&&b"first"[..]);
+        let first = tree.get_raw(&b"first"[..]);
         assert!(first.is_some());
-        let second = tree.get_raw(&&b"second"[..]);
+        let second = tree.get_raw(&b"second"[..]);
         assert!(second.is_some());
     }
 
@@ -142,7 +142,7 @@ mod test {
         let mut tree = MerklePatriciaTrie::default();
 
         tree.set_raw(&[0x0], b"value".to_vec());
-        let first = tree.get_raw(&&[0x0][..]);
+        let first = tree.get_raw(&[0x0][..]);
         assert!(first.is_some());
     }
 
@@ -166,7 +166,7 @@ mod test {
             let values = paths.clone();
 
             for (path, value) in paths.iter().zip(values.iter()) {
-                tree.set_raw(&path, value.clone());
+                tree.set_raw(path, value.clone());
             }
 
             for (path, value) in paths.iter().zip(values.iter()) {
@@ -184,11 +184,11 @@ mod test {
         tree.set_raw(&[16], vec![0]);
         tree.set_raw(&[16, 0], vec![0]);
 
-        let item = tree.get_raw(&vec![16]);
+        let item = tree.get_raw(&[16]);
         assert!(item.is_some());
         assert_eq!(item.unwrap(), &[0]);
 
-        let item = tree.get_raw(&vec![16, 0]);
+        let item = tree.get_raw(&[16, 0]);
         assert!(item.is_some());
         assert_eq!(item.unwrap(), &[0]);
     }
@@ -200,11 +200,11 @@ mod test {
         tree.set_raw(&[0, 0], vec![0, 0]);
         tree.set_raw(&[1, 0], vec![1, 0]);
 
-        let item = tree.get_raw(&vec![1, 0]);
+        let item = tree.get_raw(&[1, 0]);
         assert!(item.is_some());
         assert_eq!(item.unwrap(), &[1, 0]);
 
-        let item = tree.get_raw(&vec![0, 0]);
+        let item = tree.get_raw(&[0, 0]);
         assert!(item.is_some());
         assert_eq!(item.unwrap(), &[0, 0]);
     }
@@ -225,23 +225,23 @@ mod test {
         );
         tree.set_raw(&[138, 101, 157], vec![138, 101, 157]);
 
-        let item = tree.get_raw(&vec![26, 192, 44, 251]);
+        let item = tree.get_raw(&[26, 192, 44, 251]);
         assert!(item.is_some());
         assert_eq!(item.unwrap(), &[26, 192, 44, 251]);
 
-        let item = tree.get_raw(&vec![195, 132, 220, 124, 112, 201, 70, 128, 235]);
+        let item = tree.get_raw(&[195, 132, 220, 124, 112, 201, 70, 128, 235]);
         assert!(item.is_some());
         assert_eq!(item.unwrap(), &[195, 132, 220, 124, 112, 201, 70, 128, 235]);
 
-        let item = tree.get_raw(&vec![126, 138, 25, 245, 146]);
+        let item = tree.get_raw(&[126, 138, 25, 245, 146]);
         assert!(item.is_some());
         assert_eq!(item.unwrap(), &[126, 138, 25, 245, 146]);
 
-        let item = tree.get_raw(&vec![129, 176, 66, 2, 150, 151, 180, 60, 124]);
+        let item = tree.get_raw(&[129, 176, 66, 2, 150, 151, 180, 60, 124]);
         assert!(item.is_some());
         assert_eq!(item.unwrap(), &[129, 176, 66, 2, 150, 151, 180, 60, 124]);
 
-        let item = tree.get_raw(&vec![138, 101, 157]);
+        let item = tree.get_raw(&[138, 101, 157]);
         assert!(item.is_some());
         assert_eq!(item.unwrap(), &[138, 101, 157]);
     }
@@ -288,9 +288,9 @@ mod test {
         tree.set_raw(&[0xC8], vec![0xC8]);
         tree.set_raw(&[0xC8, 0x00], vec![0xC8, 0x00]);
 
-        assert_eq!(tree.get_raw(&vec![0x00]), Some(vec![0x00]));
-        assert_eq!(tree.get_raw(&vec![0xC8]), Some(vec![0xC8]));
-        assert_eq!(tree.get_raw(&vec![0xC8, 0x00]), Some(vec![0xC8, 0x00]));
+        assert_eq!(tree.get_raw(&[0x00]), Some(vec![0x00]));
+        assert_eq!(tree.get_raw(&[0xC8]), Some(vec![0xC8]));
+        assert_eq!(tree.get_raw(&[0xC8, 0x00]), Some(vec![0xC8, 0x00]));
     }
 
     #[test]
@@ -304,12 +304,12 @@ mod test {
         tree.set_raw(&[0x19, 0x00], vec![0x19, 0x00]);
         tree.set_raw(&[0x1A], vec![0x1A]);
 
-        assert_eq!(tree.get_raw(&vec![0x00]), Some(vec![0x00]));
-        assert_eq!(tree.get_raw(&vec![0x01]), Some(vec![0x01]));
-        assert_eq!(tree.get_raw(&vec![0x10]), Some(vec![0x10]));
-        assert_eq!(tree.get_raw(&vec![0x19]), Some(vec![0x19]));
-        assert_eq!(tree.get_raw(&vec![0x19, 0x00]), Some(vec![0x19, 0x00]));
-        assert_eq!(tree.get_raw(&vec![0x1A]), Some(vec![0x1A]));
+        assert_eq!(tree.get_raw(&[0x00]), Some(vec![0x00]));
+        assert_eq!(tree.get_raw(&[0x01]), Some(vec![0x01]));
+        assert_eq!(tree.get_raw(&[0x10]), Some(vec![0x10]));
+        assert_eq!(tree.get_raw(&[0x19]), Some(vec![0x19]));
+        assert_eq!(tree.get_raw(&[0x19, 0x00]), Some(vec![0x19, 0x00]));
+        assert_eq!(tree.get_raw(&[0x1A]), Some(vec![0x1A]));
     }
 
     #[test]
