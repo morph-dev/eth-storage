@@ -7,11 +7,11 @@ use ssz::{Decode, Encode};
 
 use crate::{
     committer::DEFAULT_COMMITER,
-    utils::{b256_to_fr, fr_to_b256},
+    utils::{b256_to_element, element_to_b256},
     Db, TrieKey, TrieValue,
 };
 
-use super::{node::NodeTrait, LeafNode, Node};
+use super::{node::NodeTrait, CommitmentNode, LeafNode, Node};
 
 pub struct BranchNode {
     values: BTreeMap<u8, Node>,
@@ -31,7 +31,7 @@ impl BranchNode {
         self.update_commitment(
             index,
             old_node
-                .map(|node| node.hash_commitment())
+                .map(|node| node.commitment_hash())
                 .unwrap_or_default(),
         );
     }
@@ -46,7 +46,6 @@ impl BranchNode {
         match self.values.get_mut(&index) {
             Some(node) => {
                 node.insert(depth + 1, key, value, db)?;
-                node.hash_commitment_mut();
             }
             None => {
                 self.values
@@ -60,7 +59,7 @@ impl BranchNode {
     fn get_child_commit(&mut self, index: u8) -> Fr {
         self.values
             .get_mut(&index)
-            .map(|node| node.hash_commitment_mut())
+            .map(|node| node.commitment_hash_write())
             .unwrap_or_default()
     }
 
@@ -70,11 +69,11 @@ impl BranchNode {
             DEFAULT_COMMITER.scalar_mul(index as usize, post_commitment - pre_commitment);
     }
 
-    pub fn write_and_commit(&mut self, db: &mut Db) -> Result<Fr> {
+    pub fn write_and_commit(&mut self, db: &mut Db) -> Result<Element> {
         for (_, node) in self.values.iter_mut() {
             node.write_and_commit(db)?;
         }
-        Ok(self.hash_commitment_mut())
+        Ok(self.commitment_write())
     }
 }
 
@@ -85,8 +84,12 @@ impl Default for BranchNode {
 }
 
 impl NodeTrait for BranchNode {
-    fn hash_commitment(&self) -> Fr {
-        self.commitment.map_to_scalar_field()
+    fn commitment_write(&mut self) -> Element {
+        self.commitment
+    }
+
+    fn commitment(&self) -> Element {
+        self.commitment
     }
 }
 
@@ -99,7 +102,7 @@ impl Encode for BranchNode {
         let commitments: BTreeMap<u8, B256> = self
             .values
             .iter()
-            .map(|(index, node)| (*index, fr_to_b256(&node.hash_commitment())))
+            .map(|(index, node)| (*index, element_to_b256(&node.commitment())))
             .collect();
         commitments.ssz_append(buf);
     }
@@ -123,13 +126,18 @@ impl Decode for BranchNode {
 
         let values = commitments
             .iter()
-            .map(|(index, c)| (*index, Node::Commitment(b256_to_fr(c))))
+            .map(|(index, c)| {
+                (
+                    *index,
+                    Node::Commitment(CommitmentNode::new(b256_to_element(c))),
+                )
+            })
             .collect();
 
         let commitment = DEFAULT_COMMITER.commit_sparse(
             commitments
                 .iter()
-                .map(|(index, commitment)| (*index as usize, b256_to_fr(commitment)))
+                .map(|(index, c)| (*index as usize, b256_to_element(c).map_to_scalar_field()))
                 .collect(),
         );
 

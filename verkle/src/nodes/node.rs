@@ -2,41 +2,63 @@ use std::mem;
 
 use alloy_primitives::B256;
 use anyhow::{anyhow, bail, Result};
-use banderwagon::Fr;
+use banderwagon::{Element, Fr};
 use ssz::{Decode, Encode};
 
 use crate::{Db, TrieKey, TrieValue};
 
-use super::{BranchNode, LeafNode};
+use super::{BranchNode, CommitmentNode, LeafNode};
 
 pub trait NodeTrait {
-    fn hash_commitment(&self) -> Fr;
+    fn commitment_write(&mut self) -> Element;
 
-    fn hash_commitment_mut(&mut self) -> Fr {
-        self.hash_commitment()
+    fn commitment(&self) -> Element;
+
+    fn commitment_hash_write(&mut self) -> Fr {
+        self.commitment_write().map_to_scalar_field()
+    }
+
+    fn commitment_hash(&self) -> Fr {
+        self.commitment().map_to_scalar_field()
     }
 }
 
 pub enum Node {
     Branch(BranchNode),
     Leaf(LeafNode),
-    Commitment(Fr),
+    Commitment(CommitmentNode),
 }
 
 impl NodeTrait for Node {
-    fn hash_commitment(&self) -> Fr {
+    fn commitment_write(&mut self) -> Element {
         match self {
-            Node::Branch(branch_node) => branch_node.hash_commitment(),
-            Node::Leaf(leaf_node) => leaf_node.hash_commitment(),
-            Node::Commitment(c) => *c,
+            Node::Branch(branch_node) => branch_node.commitment_write(),
+            Node::Leaf(leaf_node) => leaf_node.commitment_write(),
+            Node::Commitment(commitment_node) => commitment_node.commitment_write(),
         }
     }
 
-    fn hash_commitment_mut(&mut self) -> Fr {
+    fn commitment(&self) -> Element {
         match self {
-            Node::Branch(branch_node) => branch_node.hash_commitment_mut(),
-            Node::Leaf(leaf_node) => leaf_node.hash_commitment_mut(),
-            Node::Commitment(c) => *c,
+            Node::Branch(branch_node) => branch_node.commitment(),
+            Node::Leaf(leaf_node) => leaf_node.commitment(),
+            Node::Commitment(commitment_node) => commitment_node.commitment(),
+        }
+    }
+
+    fn commitment_hash_write(&mut self) -> Fr {
+        match self {
+            Node::Branch(branch_node) => branch_node.commitment_hash_write(),
+            Node::Leaf(leaf_node) => leaf_node.commitment_hash_write(),
+            Node::Commitment(commitment_node) => commitment_node.commitment_hash_write(),
+        }
+    }
+
+    fn commitment_hash(&self) -> Fr {
+        match self {
+            Node::Branch(branch_node) => branch_node.commitment_hash(),
+            Node::Leaf(leaf_node) => leaf_node.commitment_hash(),
+            Node::Commitment(commitment_node) => commitment_node.commitment_hash(),
         }
     }
 }
@@ -46,13 +68,13 @@ impl Node {
         Self::Branch(BranchNode::new())
     }
 
-    pub fn check(&self, commitment: &Fr) -> Result<()> {
-        if &self.hash_commitment() == commitment {
+    pub fn check(&self, commitment: &Element) -> Result<()> {
+        if &self.commitment() == commitment {
             Ok(())
         } else {
             Err(anyhow!(
                 "Node's commitment {:?} doesn't match expected {commitment:?}",
-                self.hash_commitment()
+                self.commitment()
             ))
         }
     }
@@ -76,13 +98,13 @@ impl Node {
                         return Ok(None);
                     }
                 }
-                Node::Commitment(c) => {
-                    let Some(bytes) = db.read(c)? else {
-                        bail!("Node {c:?} not found in db")
+                Node::Commitment(commitment_node) => {
+                    let Some(bytes) = db.read(&commitment_node.commitment())? else {
+                        bail!("Node {:?} not found in db", commitment_node.commitment())
                     };
                     let new_node = Node::from_ssz_bytes(&bytes)
                         .map_err(|e| anyhow!("Error decoding node: {e:?}"))?;
-                    new_node.check(c)?;
+                    new_node.check(&commitment_node.commitment())?;
                     *node = new_node;
                 }
             };
@@ -109,36 +131,35 @@ impl Node {
                     *self = Node::Branch(branch_node)
                 }
             }
-            Node::Commitment(c) => {
-                let Some(bytes) = db.read(c)? else {
-                    bail!("Node {c:?} not found in db")
+            Node::Commitment(commitment_node) => {
+                let Some(bytes) = db.read(&commitment_node.commitment())? else {
+                    bail!("Node {:?} not found in db", commitment_node.commitment())
                 };
                 let mut node = Node::from_ssz_bytes(&bytes)
                     .map_err(|e| anyhow!("Error decoding node: {e:?}"))?;
                 node.insert(depth, key, value, db)?;
-                node.check(c)?;
+                node.check(&commitment_node.commitment())?;
                 *self = node;
             }
         };
         Ok(())
     }
 
-    pub fn write_and_commit(&mut self, db: &mut Db) -> Result<Fr> {
+    pub fn write_and_commit(&mut self, db: &mut Db) -> Result<Element> {
         match self {
             Node::Branch(branch_node) => {
-                branch_node.write_and_commit(db)?;
-                let c = branch_node.hash_commitment_mut();
+                let c = branch_node.write_and_commit(db)?;
                 db.write(c, self.as_ssz_bytes())?;
-                *self = Node::Commitment(c);
+                *self = Node::Commitment(CommitmentNode::new(c));
                 Ok(c)
             }
             Node::Leaf(leaf_node) => {
-                let c = leaf_node.hash_commitment_mut();
+                let c = leaf_node.commitment_write();
                 db.write(c, self.as_ssz_bytes())?;
-                *self = Node::Commitment(c);
+                *self = Node::Commitment(CommitmentNode::new(c));
                 Ok(c)
             }
-            _ => Ok(self.hash_commitment_mut()),
+            Node::Commitment(commitment_node) => Ok(commitment_node.commitment_write()),
         }
     }
 }

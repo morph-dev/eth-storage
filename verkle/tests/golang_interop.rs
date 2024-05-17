@@ -1,14 +1,15 @@
 #[cfg(test)]
 mod interop {
+    use std::str::FromStr;
+
     use alloy_primitives::B256;
-    use banderwagon::{CanonicalDeserialize, Element};
     use db::memory_db::MemoryDb;
     use verkle::{Trie, TrieKey, TrieValue};
 
     // This is a fixed test, that checks whether the verkle trie logic has changed
     // This test is also in the golang code, see: https://github.com/ethereum/go-verkle/blob/f8289fc59149a40673e56f790f6edaec64992294/tree_test.go#L1081
     #[test]
-    fn golang_rust_interop() {
+    fn golang_rust_interop() -> anyhow::Result<()> {
         let mut trie = Trie::new(Box::new(MemoryDb::new()));
         let keys = vec![
             [
@@ -63,14 +64,10 @@ mod interop {
             .unwrap();
         }
 
-        let root = trie.root_hash_commitment().unwrap();
-
-        let expected_commitment =
-            "10ed89d89047bb168baa4e69b8607e260049e928ddbcb2fdd23ea0f4182b1f8a";
-        let expected_hash_commitment =
-            Element::deserialize_compressed(hex::decode(expected_commitment).unwrap().as_slice())
-                .unwrap();
-
-        assert_eq!(root, expected_hash_commitment.map_to_scalar_field());
+        assert_eq!(
+            trie.root()?,
+            B256::from_str("0x10ed89d89047bb168baa4e69b8607e260049e928ddbcb2fdd23ea0f4182b1f8a")?
+        );
+        Ok(())
     }
 }

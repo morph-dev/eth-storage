@@ -1,7 +1,7 @@
 use alloy_primitives::{B256, U256};
 use derive_more::{Constructor, Deref, From, Index};
 
-use banderwagon::Fr;
+use banderwagon::Element;
 use stem::Stem;
 pub use trie::Trie;
 
@@ -16,7 +16,7 @@ mod utils;
 
 pub type TrieValue = U256;
 
-type Db = dyn db::Db<Fr, Vec<u8>>;
+type Db = dyn db::Db<Element, Vec<u8>>;
 
 #[derive(PartialEq, Eq, Clone, Copy, Constructor, Index, Deref, From)]
 pub struct TrieKey(B256);

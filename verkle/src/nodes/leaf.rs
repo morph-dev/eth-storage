@@ -34,7 +34,7 @@ pub struct LeafNode {
     #[ssz(skip_serializing)]
     const_c: Element,
     #[ssz(skip_serializing)]
-    hash_commitment: Option<Fr>,
+    commitment: Option<Element>,
 }
 
 impl LeafNode {
@@ -49,7 +49,7 @@ impl LeafNode {
             c1: Element::zero(),
             c2: Element::zero(),
             const_c,
-            hash_commitment: None,
+            commitment: None,
         }
     }
 
@@ -99,7 +99,7 @@ impl LeafNode {
         } else {
             self.c2 += diff;
         };
-        self.hash_commitment = None;
+        self.commitment = None;
     }
 
     pub fn set_all(&mut self, values: impl IntoIterator<Item = (u8, TrieValue)>) {
@@ -118,14 +118,17 @@ impl LeafNode {
 }
 
 impl NodeTrait for LeafNode {
-    fn hash_commitment(&self) -> Fr {
-        self.hash_commitment
-            .unwrap_or_else(|| self.calculate_commitment().map_to_scalar_field())
+    fn commitment_write(&mut self) -> Element {
+        let commitment = self
+            .commitment
+            .unwrap_or_else(|| self.calculate_commitment());
+        self.commitment = Some(commitment);
+        commitment
     }
 
-    fn hash_commitment_mut(&mut self) -> Fr {
-        self.hash_commitment = Some(self.hash_commitment());
-        self.hash_commitment.expect("Value must be present")
+    fn commitment(&self) -> Element {
+        self.commitment
+            .unwrap_or_else(|| self.calculate_commitment())
     }
 }
 
@@ -160,10 +163,10 @@ mod tests {
     #[test]
     fn insert_key0_value0() {
         let key = TrieKey::new(B256::ZERO);
-        let mut leaf = LeafNode::new_for_key_value(&key, TrieValue::ZERO);
+        let leaf = LeafNode::new_for_key_value(&key, TrieValue::ZERO);
 
         assert_eq!(
-            fr_to_b256(&leaf.hash_commitment_mut()).to_string(),
+            fr_to_b256(&leaf.commitment_hash()).to_string(),
             "0x1c0727f0c6c9887189f75a9d08b804aba20892a238e147750767eac22a830d08"
         );
     }
@@ -171,10 +174,10 @@ mod tests {
     #[test]
     fn insert_key1_value1() {
         let key = TrieKey::new(U256::from(1).into());
-        let mut leaf = LeafNode::new_for_key_value(&key, TrieValue::from(1));
+        let leaf = LeafNode::new_for_key_value(&key, TrieValue::from(1));
 
         assert_eq!(
-            fr_to_b256(&leaf.hash_commitment_mut()).to_string(),
+            fr_to_b256(&leaf.commitment_hash()).to_string(),
             "0x6ef020caaeda01ff573afe6df6460d4aae14b4987e02ea39074f270ce62dfc14"
         );
     }
@@ -186,10 +189,10 @@ mod tests {
             25, 26, 27, 28, 29, 30, 31, 32,
         ];
         let key = TrieKey::new(B256::from(bytes));
-        let mut leaf = LeafNode::new_for_key_value(&key, TrieValue::from_le_bytes(bytes));
+        let leaf = LeafNode::new_for_key_value(&key, TrieValue::from_le_bytes(bytes));
 
         assert_eq!(
-            fr_to_b256(&leaf.hash_commitment_mut()).to_string(),
+            fr_to_b256(&leaf.commitment_hash()).to_string(),
             "0xb897ba52c5317acd75f5f3c3922f461357d4fb8b685fe63f20a3b2adb014370a"
         );
     }
@@ -231,7 +234,7 @@ mod tests {
         );
 
         assert_eq!(
-            fr_to_b256(&leaf.hash_commitment_mut()).to_string(),
+            fr_to_b256(&leaf.commitment_hash()).to_string(),
             "0xcc30be1f0d50eacfacaa3361b8df4d2014a849854a6cf35e6c55e07d6963f519"
         );
     }

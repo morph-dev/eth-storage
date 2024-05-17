@@ -1,11 +1,11 @@
 use alloy_primitives::{keccak256, Address, B256, U256};
 use anyhow::Result;
-use banderwagon::Fr;
+use banderwagon::Element;
 
 use crate::{
-    nodes::Node,
+    nodes::{CommitmentNode, Node},
     storage::AccountStorageLayout,
-    utils::{b256_to_fr, fr_to_b256},
+    utils::{b256_to_element, element_to_b256},
     Db, TrieKey, TrieValue,
 };
 
@@ -24,7 +24,7 @@ impl Trie {
 
     pub fn new_with_root(root: B256, db: Box<Db>) -> Self {
         Self {
-            root: Node::Commitment(b256_to_fr(&root)),
+            root: Node::Commitment(CommitmentNode::new(b256_to_element(&root))),
             db,
         }
     }
@@ -39,12 +39,12 @@ impl Trie {
         self.root.insert(0, key, value, self.db.as_ref())
     }
 
-    pub fn root(&mut self) -> Result<B256> {
-        Ok(fr_to_b256(&self.root_hash_commitment()?))
+    pub fn root_commitment(&mut self) -> Result<Element> {
+        self.root.write_and_commit(self.db.as_mut())
     }
 
-    pub fn root_hash_commitment(&mut self) -> Result<Fr> {
-        self.root.write_and_commit(self.db.as_mut())
+    pub fn root(&mut self) -> Result<B256> {
+        Ok(element_to_b256(&self.root_commitment()?))
     }
 
     pub fn create_eoa(&mut self, address: Address, balance: U256, nonce: u64) -> Result<()> {
@@ -54,10 +54,7 @@ impl Trie {
         self.insert(storage.nonce_key(), TrieValue::from(nonce))?;
         self.insert(
             storage.code_hash_key(),
-            TrieValue::from_le_slice(
-                hex::decode("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")?
-                    .as_slice(),
-            ),
+            TrieValue::from_le_bytes(keccak256([]).0),
         )?;
         Ok(())
     }
@@ -87,6 +84,8 @@ impl Trie {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use alloy_primitives::U256;
     use anyhow::Result;
     use ark_ff::UniformRand;
@@ -94,6 +93,8 @@ mod tests {
     use db::memory_db::MemoryDb;
     use rand::{rngs::StdRng, SeedableRng};
     use rstest::rstest;
+
+    use crate::utils::fr_to_b256;
 
     use super::*;
 
@@ -104,7 +105,7 @@ mod tests {
     #[test]
     fn empty() -> Result<()> {
         let mut trie = init();
-        assert_eq!(trie.root()?, B256::ZERO);
+        assert_eq!(trie.root_commitment()?, Element::zero());
         Ok(())
     }
 
@@ -120,8 +121,8 @@ mod tests {
         assert_some_eq!(trie.get(key)?, value);
 
         assert_eq!(
-            trie.root()?.to_string(),
-            "0xff00a9f3f2d4f58fc23bceebf6b2310419ceac2c30445e2f374e571487715015"
+            fr_to_b256(&trie.root_commitment()?.map_to_scalar_field()),
+            B256::from_str("0xff00a9f3f2d4f58fc23bceebf6b2310419ceac2c30445e2f374e571487715015")?,
         );
         assert_some_eq!(trie.get(key)?, value);
 
@@ -140,8 +141,8 @@ mod tests {
         assert_some_eq!(trie.get(key)?, value);
 
         assert_eq!(
-            trie.root()?.to_string(),
-            "0x11b55d77cefcb0b1903d6156f3011511a81ec0c838a03a074eba374545b00a06"
+            fr_to_b256(&trie.root_commitment()?.map_to_scalar_field()),
+            B256::from_str("0x11b55d77cefcb0b1903d6156f3011511a81ec0c838a03a074eba374545b00a06")?,
         );
         assert_some_eq!(trie.get(key)?, value);
 

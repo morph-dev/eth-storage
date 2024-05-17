@@ -40,6 +40,7 @@ impl Bases {
 mod tests {
     use ark_serialize::Valid;
     use banderwagon::CanonicalSerialize;
+    use const_hex::encode;
 
     use super::*;
 
@@ -54,14 +55,14 @@ mod tests {
     fn first_point() {
         let mut bytes = vec![];
         CRS[0].serialize_compressed(&mut bytes).unwrap();
-        assert_eq!(hex::encode(bytes), FIRST_POINT);
+        assert_eq!(encode(bytes), FIRST_POINT);
     }
 
     #[test]
     fn last_point() {
         let mut bytes = vec![];
         CRS[255].serialize_compressed(&mut bytes).unwrap();
-        assert_eq!(hex::encode(bytes), LAST_POINT);
+        assert_eq!(encode(bytes), LAST_POINT);
     }
 
     #[test]
@@ -73,7 +74,7 @@ mod tests {
             hasher.update(bytes);
         }
 
-        assert_eq!(hex::encode(hasher.finalize()), ALL_POINTS_SHA);
+        assert_eq!(encode(hasher.finalize()), ALL_POINTS_SHA);
     }
 
     #[test]
